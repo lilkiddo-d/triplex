@@ -28,13 +28,21 @@ contract Deploy is Script, DeployBase {
             treasury: vm.envOr("TREASURY", address(0))
         });
 
-        uint256 startBlock = block.number;
+        // On Arbitrum-based chains `block.number` is an L1 estimate; logs are indexed by the L2 number.
+        uint256 startBlock = _l2BlockNumber();
         vm.startBroadcast(deployer);
         d = _deploy(r);
         vm.stopBroadcast();
 
         _log(d, r);
         _write(d, startBlock);
+    }
+
+    function _l2BlockNumber() internal returns (uint256) {
+        bytes memory raw = vm.rpc("eth_blockNumber", "[]");
+        uint256 n;
+        for (uint256 i; i < raw.length; ++i) n = (n << 8) | uint8(raw[i]);
+        return n;
     }
 
     // ---------------------------------------------------------------- outputs
