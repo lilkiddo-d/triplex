@@ -16,7 +16,7 @@ export const localFork = defineChain({
   id: 31337,
   name: "Triplex Local Fork",
   nativeCurrency: ROBINHOOD_CHAIN.nativeCurrency,
-  rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
+  rpcUrls: { default: { http: [ENV.rpcUrl || "http://127.0.0.1:8545"] } },
   // Explorer links on the fork point at the mainnet explorer (useful for forked state only).
   blockExplorers: { default: ROBINHOOD_CHAIN.blockExplorer },
   contracts: { multicall3: { address: MULTICALL3 } },
