@@ -95,13 +95,17 @@ contract GovernanceTest is Base {
         assertTrue(hooks.isActive());
     }
 
-    function test_timelock_floor() public {
+    function test_timelock_constructorRejectsShortDelay() public {
         address[] memory a = new address[](0);
-        vm.expectRevert(abi.encodeWithSelector(Timelock.DelayBelowFloor.selector, 1 hours));
+        vm.expectRevert(abi.encodeWithSelector(Timelock.DelayBelowFloor.selector, uint256(1 hours)));
         new Timelock(1 hours, a, a);
+    }
+
+    function test_timelock_floorCannotBeUndercut() public {
+        address[] memory a = new address[](0);
         Timelock tl = new Timelock(72 hours, a, a);
         assertEq(tl.getMinDelay(), 72 hours);
-        // self-governed delay reduction still cannot undercut the floor
+        // a self-governed delay reduction still cannot undercut the 48h floor
         vm.prank(address(tl));
         tl.updateDelay(1);
         assertEq(tl.getMinDelay(), 48 hours);

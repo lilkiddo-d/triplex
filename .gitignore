@@ -11,3 +11,7 @@ coverage/
 *.log
 .vercel
 __pycache__/
+contracts/deployments/*-dryrun.json
+contracts/broadcast/*/*/dry-run/
+contracts/slither.json
+contracts/cache/

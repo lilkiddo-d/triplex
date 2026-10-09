@@ -321,7 +321,7 @@ contract LeveragedToken is
 
     function _fee(address account, uint256 amount, uint256 bps) internal view returns (uint256) {
         if (bps == 0 || account == registry.feeCollector()) return 0;
-        uint256 discount;
+        uint256 discount = 0;
         IProjectTokenHooks hooks = registry.projectTokenHooks();
         if (address(hooks) != address(0)) discount = hooks.feeDiscountBps(account);
         if (discount >= Constants.BPS) return 0;

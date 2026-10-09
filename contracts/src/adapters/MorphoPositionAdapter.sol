@@ -221,6 +221,9 @@ contract MorphoPositionAdapter is IPositionAdapter, IMorphoFlashLoanCallback, In
     }
 
     /// @inheritdoc IPositionAdapter
+    /// @dev The before/after quote balance delta measures this call's own flows. The function is nonReentrant and
+    ///      onlyProduct, and the flash-loan callback only accepts Morpho while an op is active.
+    // slither-disable-start reentrancy-balance
     function mintProportional(uint256 quoteIn, uint256 fractionWad, address refundTo)
         external
         onlyProduct
@@ -255,6 +258,7 @@ contract MorphoPositionAdapter is IPositionAdapter, IMorphoFlashLoanCallback, In
         if (refund != 0) IERC20(quote).safeTransfer(refundTo, refund);
         emit MintExecuted(fractionWad, used, addColl, addDebt);
     }
+    // slither-disable-end reentrancy-balance
 
     /// @inheritdoc IPositionAdapter
     function redeemProportional(uint256 fractionWad, address to)

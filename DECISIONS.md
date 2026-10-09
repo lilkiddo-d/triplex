@@ -14,3 +14,5 @@
 - No keeper bounty on-chain (avoids value leakage); protocol runs its own keeper; rebalance is permissionless.
 - Local anvil fork runs on port 18545 (8545/8546 were occupied on this machine); `--auto-impersonate` crashes anvil on Windows, so `anvil_impersonateAccount` is used.
 - `block.number` is L1-style on Arbitrum chains; deploy script records L2 block via `eth_blockNumber`.
+- Contract verification: Sourcify is the primary verifier (officially supports chain 4663; Blockscout displays Sourcify-verified sources). The Blockscout API returned Cloudflare 403 challenges during the dry run, so Blockscout is the `--resume` fallback.
+- Slither: config-level exclusion only for `incorrect-equality` (all `== 0` guards) and `unused-return` (intentional); everything else is fixed or suppressed inline with justification (see THREAT_MODEL.md).

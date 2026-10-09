@@ -186,8 +186,11 @@ contract Rebalancer is AccessControl, Pausable, ReentrancyGuard {
     }
 
     /// @notice Executes one rebalance step for `product`. Permissionless.
+    // Writes after the adapter call are safe: the function is nonReentrant and the adapter only calls trusted
+    // venues (Morpho, governance-set swap adapter).
+    // slither-disable-start reentrancy-no-eth
     function rebalance(address product) external nonReentrant whenNotPaused returns (Mode) {
-        Step memory st;
+        Step memory st = Step(Mode.None, 0, false, 0, false, 0);
         (st.mode, st.levBefore, st.increase, st.chunk, st.ready) = check(product);
         if (st.mode == Mode.None) revert NothingToDo();
         Config memory c = configOf(product);
@@ -207,6 +210,7 @@ contract Rebalancer is AccessControl, Pausable, ReentrancyGuard {
         );
         return st.mode;
     }
+    // slither-disable-end reentrancy-no-eth
 
     /// @dev Closes out the trading day (snapshot) once leverage is back within tolerance in the daily window.
     function _completeDayIfDone(address product, IPositionAdapter a, uint256 toleranceBps)

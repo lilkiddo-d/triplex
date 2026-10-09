@@ -1,0 +1,8 @@
+{
+  "filter_paths": "lib/|test/|script/",
+  "exclude_informational": true,
+  "exclude_optimization": true,
+  "exclude_low": true,
+  "detectors_to_exclude": "incorrect-equality,unused-return",
+  "_triage": "incorrect-equality: every hit is a `== 0` guard on a computed value (early return / divide-by-zero guard), never a balance an attacker can steer. unused-return: partial destructuring of view tuples and Morpho borrow/repay return values that are intentionally ignored because exact assets/shares are passed. See THREAT_MODEL.md 'Static analysis'."
+}

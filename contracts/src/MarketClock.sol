@@ -127,6 +127,8 @@ contract MarketClock is IMarketClock, AccessControl {
 
     // ------------------------------------------------------------------ calendar math
 
+    // Calendar arithmetic: `%` here is modular date math, not randomness.
+    // slither-disable-start weak-prng
     function _session(uint256 ts) internal view returns (bool tradingDay, uint256 secs, uint256 closeAt) {
         uint256 local = _toLocal(ts);
         uint256 dayId = local / 1 days;
@@ -161,6 +163,10 @@ contract MarketClock is IMarketClock, AccessControl {
         return first + ((7 - wd) % 7) + 7 * (n - 1);
     }
 
+    // slither-disable-end weak-prng
+
+    // Floor division is intrinsic to the civil-date algorithm (fuzz-tested round trip).
+    // slither-disable-start divide-before-multiply
     /// @notice Days since 1970-01-01 for a proleptic Gregorian date (H. Hinnant's algorithm), y >= 1970.
     function daysFromCivil(uint256 y, uint256 m, uint256 d) public pure returns (uint256) {
         if (m <= 2) y -= 1;
@@ -184,4 +190,5 @@ contract MarketClock is IMarketClock, AccessControl {
         m = mp < 10 ? mp + 3 : mp - 9;
         if (m <= 2) y += 1;
     }
+    // slither-disable-end divide-before-multiply
 }
