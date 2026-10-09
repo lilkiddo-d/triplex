@@ -36,7 +36,11 @@ contract Rebalancer is AccessControl, Pausable, ReentrancyGuard {
     struct State {
         uint64 lastChunkAt;
         uint64 lastDailyDay;
+        bool emergencyActive; // set when leverage left the band; cleared once back within tolerance of target
     }
+
+    /// @notice Products with less equity than this (1 quote token) are not rebalanced.
+    uint256 public constant MIN_EQUITY = 1e18;
 
     ITriplexRegistry public immutable registry;
     Config public defaultConfig;
@@ -127,12 +131,15 @@ contract Rebalancer is AccessControl, Pausable, ReentrancyGuard {
         (bool ok,) = registry.oracle().tryGetQuotePrice(t.underlying(), t.quoteToken());
         if (!ok) return (false, 0, 0);
         (exposure,,, equity) = a.positionValues();
-        live = equity != 0;
+        live = equity >= MIN_EQUITY; // dust (e.g. only the locked dead shares left) is not worth trading
+
     }
 
     function _mode(address product, uint256 leverage) internal view returns (Mode) {
         ILeveragedToken t = ILeveragedToken(product);
         if (leverage < t.minLeverage() || leverage > t.maxLeverage()) return Mode.Emergency;
+        // an emergency de/re-leverage continues all the way back to target, not just to the band edge
+        if (state[product].emergencyActive && !_withinTolerance(product, leverage)) return Mode.Emergency;
         IMarketClock clock = registry.marketClock();
         if (clock.isDailyRebalanceWindow() && state[product].lastDailyDay < clock.tradingDayId(block.timestamp)) {
             return Mode.Daily;
@@ -194,6 +201,7 @@ contract Rebalancer is AccessControl, Pausable, ReentrancyGuard {
         }
 
         st.levAfter = _completeDayIfDone(product, a, c.toleranceBps);
+        state[product].emergencyActive = st.mode == Mode.Emergency && !_withinTolerance(product, st.levAfter);
         emit Rebalanced(
             product, st.mode, st.increase, st.chunk, st.levBefore, st.levAfter, _nav(product), a.assetPrice()
         );
@@ -221,6 +229,12 @@ contract Rebalancer is AccessControl, Pausable, ReentrancyGuard {
             t.recordDailySnapshot();
             emit DailyCompleted(product, day, levAfter);
         }
+    }
+
+    function _withinTolerance(address product, uint256 leverage) internal view returns (bool) {
+        uint256 target = ILeveragedToken(product).targetLeverage();
+        uint256 diff = leverage > target ? leverage - target : target - leverage;
+        return diff * Constants.BPS <= target * configOf(product).toleranceBps;
     }
 
     function _nav(address product) internal view returns (uint256) {

@@ -161,7 +161,7 @@ abstract contract Base is Test {
                 mgmtFeeBps: 100,
                 supplyCapEquity: 0,
                 minMintQuote: 1e6,
-                mintBufferBps: 100
+                mintBufferBps: t >= 3e18 ? 300 : (t >= 2e18 ? 200 : 100)
             })
         );
         return LeveragedToken(p);

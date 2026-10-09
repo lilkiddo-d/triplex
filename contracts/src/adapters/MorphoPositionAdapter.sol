@@ -34,7 +34,9 @@ contract MorphoPositionAdapter is IPositionAdapter, IMorphoFlashLoanCallback, In
         RedeemLong,
         RedeemShort,
         DecreaseLong,
-        DecreaseShort
+        DecreaseShort,
+        IncreaseLong,
+        IncreaseShort
     }
 
     uint256 private constant VIRTUAL_SHARES = 1e6; // Morpho SharesMathLib
@@ -287,26 +289,23 @@ contract MorphoPositionAdapter is IPositionAdapter, IMorphoFlashLoanCallback, In
     // ================================================================== rebalancer actions
 
     /// @inheritdoc IPositionAdapter
+    /// @dev Flash-funded so new collateral is posted before new debt: the position never passes through a state
+    ///      with more debt than the final one (a borrow-first sequence can breach the LLTV on large re-leverages).
     function increaseExposure(uint256 valueWad) external onlyRebalancer nonReentrant {
         if (valueWad == 0) revert ZeroAmount();
         morpho.accrueInterest(_params);
         uint256 p = assetPrice();
         uint256 q = _wadToQuote(valueWad);
-        uint256 s = maxSwapSlippageBps;
         if (isLong) {
-            morpho.borrow(_params, q, 0, address(this), address(this));
-            uint256 minOut = _quoteToAsset(q, p).mulDiv(Constants.BPS - s, Constants.BPS);
-            uint256 out = _swapExactIn(quote, asset, q, minOut);
-            morpho.supplyCollateral(_params, out, address(this), "");
-            emit ExposureIncreased(valueWad, out, q);
+            _flash(quote, q, Op.IncreaseLong, abi.encode(q, p));
+            emit ExposureIncreased(valueWad, _quoteToAsset(q, p), q);
         } else {
             uint256 a = _quoteToAsset(q, p);
             if (a == 0) revert ZeroAmount();
-            morpho.borrow(_params, a, 0, address(this), address(this));
-            uint256 minOut = _assetToQuote(a, p).mulDiv(Constants.BPS - s, Constants.BPS);
-            uint256 out = _swapExactIn(asset, quote, a, minOut);
-            morpho.supplyCollateral(_params, out, address(this), "");
-            emit ExposureIncreased(valueWad, out, a);
+            // flash the conservative (post-slippage) proceeds; any excess sale proceeds become extra collateral
+            uint256 flash = q.mulDiv(Constants.BPS - maxSwapSlippageBps, Constants.BPS);
+            _flash(quote, flash, Op.IncreaseShort, abi.encode(a, flash, p));
+            emit ExposureIncreased(valueWad, flash, a);
         }
     }
 
@@ -415,6 +414,18 @@ contract MorphoPositionAdapter is IPositionAdapter, IMorphoFlashLoanCallback, In
             uint256 spent = _swapExactOut(quote, asset, a, maxQuoteIn);
             _repay(a, d);
             morpho.withdrawCollateral(_params, spent, address(this), address(this));
+        } else if (op == Op.IncreaseLong) {
+            (uint256 q, uint256 p) = abi.decode(data, (uint256, uint256));
+            uint256 minOut = _quoteToAsset(q, p).mulDiv(Constants.BPS - s, Constants.BPS);
+            uint256 out = _swapExactIn(quote, asset, q, minOut);
+            morpho.supplyCollateral(_params, out, address(this), "");
+            morpho.borrow(_params, q, 0, address(this), address(this));
+        } else if (op == Op.IncreaseShort) {
+            (uint256 a, uint256 flash, uint256 p) = abi.decode(data, (uint256, uint256, uint256));
+            morpho.supplyCollateral(_params, flash, address(this), "");
+            morpho.borrow(_params, a, 0, address(this), address(this));
+            uint256 out = _swapExactIn(asset, quote, a, Math.max(flash, _assetToQuote(a, p).mulDiv(Constants.BPS - s, Constants.BPS)));
+            if (out > flash) morpho.supplyCollateral(_params, out - flash, address(this), "");
         } else {
             revert UnexpectedCallback();
         }

@@ -1,0 +1,14 @@
+{
+  "name": "triplex",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Triplex: auto-rebalancing leveraged tokens for tokenized stocks on Robinhood Chain",
+  "packageManager": "pnpm@10.18.0",
+  "scripts": {
+    "build:contracts": "cd contracts && forge build",
+    "test:contracts": "cd contracts && forge test",
+    "app:dev": "pnpm --filter @triplex/app dev",
+    "app:build": "pnpm --filter @triplex/app build",
+    "keeper": "pnpm --filter @triplex/keeper start"
+  }
+}

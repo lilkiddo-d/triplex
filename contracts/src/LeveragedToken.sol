@@ -154,13 +154,12 @@ contract LeveragedToken is
         if (quoteIn == 0) revert ZeroAmount();
         accrueManagementFee();
 
-        uint256 fee = _fee(msg.sender, quoteIn, mintFeeBps);
-        uint256 net = quoteIn - fee;
+        // Budget the position with the worst-case fee; the fee is finally charged on the quote actually used.
+        uint256 net = quoteIn - _fee(msg.sender, quoteIn, mintFeeBps);
         if (net < minMintQuote) revert ZeroAmount();
 
         IERC20 q = IERC20(quoteToken);
         q.safeTransferFrom(msg.sender, address(this), quoteIn);
-        if (fee != 0) q.safeTransfer(registry.feeCollector(), fee);
         q.safeTransfer(address(adapter), net);
 
         uint256 supply = totalSupply();
@@ -179,9 +178,14 @@ contract LeveragedToken is
             uint256 netWad = net.mulDiv(Constants.WAD, 10 ** _quoteDecimals());
             uint256 k = netWad.mulDiv(Constants.BPS - mintBufferBps, Constants.BPS).mulDiv(Constants.WAD, equity0);
             if (k == 0) revert ZeroAmount();
-            used = adapter.mintProportional(net, k, msg.sender);
+            used = adapter.mintProportional(net, k, address(this));
             shares = supply.mulDiv(k, Constants.WAD);
         }
+
+        uint256 fee = _fee(msg.sender, used, mintFeeBps);
+        if (fee != 0) q.safeTransfer(registry.feeCollector(), fee);
+        uint256 refund = quoteIn - used - fee;
+        if (refund != 0) q.safeTransfer(msg.sender, refund);
 
         if (shares == 0 || shares < minSharesOut) revert Slippage();
         if (supplyCapEquity != 0) {
